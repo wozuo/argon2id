@@ -123,6 +123,16 @@ func generateRandomBytes(n uint32) ([]byte, error) {
 	return b, nil
 }
 
+// GetDecodedHash decodes a hash string and returns its raw values
+func GetDecodedHash(hash string) (memory, iterations uint32, parallelism uint8, saltLength, keyLength uint32, salt, key []byte, err error) {
+	params, salt, key, err := decodeHash(hash)
+	if err != nil {
+		return 0, 0, 0, 0, 0, nil, nil, err
+	}
+
+	return params.Memory, params.Iterations, params.Parallelism, params.SaltLength, params.KeyLength, salt, key, nil
+}
+
 func decodeHash(hash string) (params *Params, salt, key []byte, err error) {
 	vals := strings.Split(hash, "$")
 	if len(vals) != 6 {
