@@ -155,6 +155,9 @@ func decodeHash(hash string) (params *Params, salt, key []byte, err error) {
 	}
 
 	params, salt, err = decodeParams(strings.Join(vals[:5], "$") + "$")
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	key, err = base64.RawStdEncoding.DecodeString(vals[5])
 	if err != nil {
