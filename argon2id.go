@@ -89,6 +89,21 @@ func CreateHash(password string, params *Params) (hash string, err error) {
 	return hash, nil
 }
 
+// CreateSameHash derives the original key using the password, the original parameters used and the same salt value
+// paramsString contains the parameters and the salt without the key value
+func CreateSameHash(password string, paramsString string, keyLength uint32) (hash string, err error) {
+	params, salt, err := decodeParams(paramsString)
+	if err != nil {
+		return "", err
+	}
+
+	params.KeyLength = keyLength
+	key := argon2.IDKey([]byte(password), salt, params.Iterations, params.Memory, params.Parallelism, params.KeyLength)
+	b64Key := base64.RawStdEncoding.EncodeToString(key)
+	hash = fmt.Sprintf("%s%s", paramsString, b64Key)
+	return
+}
+
 // ComparePasswordAndHash performs a constant-time comparison between a
 // plain-text password and Argon2id hash, using the parameters and salt
 // contained in the hash. It returns true if they match, otherwise it returns
@@ -139,26 +154,7 @@ func decodeHash(hash string) (params *Params, salt, key []byte, err error) {
 		return nil, nil, nil, ErrInvalidHash
 	}
 
-	var version int
-	_, err = fmt.Sscanf(vals[2], "v=%d", &version)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if version != argon2.Version {
-		return nil, nil, nil, ErrIncompatibleVersion
-	}
-
-	params = &Params{}
-	_, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &params.Memory, &params.Iterations, &params.Parallelism)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	salt, err = base64.RawStdEncoding.DecodeString(vals[4])
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	params.SaltLength = uint32(len(salt))
+	params, salt, err = decodeParams(strings.Join(vals[:5], "$") + "$")
 
 	key, err = base64.RawStdEncoding.DecodeString(vals[5])
 	if err != nil {
@@ -167,4 +163,34 @@ func decodeHash(hash string) (params *Params, salt, key []byte, err error) {
 	params.KeyLength = uint32(len(key))
 
 	return params, salt, key, nil
+}
+
+func decodeParams(p string) (params *Params, salt []byte, err error) {
+	vals := strings.Split(p, "$")
+	if len(vals) != 6 {
+		return nil, nil, ErrInvalidHash
+	}
+
+	var version int
+	_, err = fmt.Sscanf(vals[2], "v=%d", &version)
+	if err != nil {
+		return nil, nil, err
+	}
+	if version != argon2.Version {
+		return nil, nil, ErrIncompatibleVersion
+	}
+
+	params = &Params{}
+	_, err = fmt.Sscanf(vals[3], "m=%d,t=%d,p=%d", &params.Memory, &params.Iterations, &params.Parallelism)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	salt, err = base64.RawStdEncoding.DecodeString(vals[4])
+	if err != nil {
+		return nil, nil, err
+	}
+	params.SaltLength = uint32(len(salt))
+
+	return params, salt, nil
 }
